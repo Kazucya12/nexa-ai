@@ -23,7 +23,7 @@
       <label>Email</label><input id="rE" type="email" autocomplete="username" placeholder="nama@email.com">
       <label>Kata sandi (min. 6 karakter)</label><input id="rP" type="password" autocomplete="new-password">
       <label>Ulangi kata sandi</label><input id="rC" type="password" autocomplete="new-password">
-      <div class="err" id="eR"></div><button class="btn" type="submit">Buat akun</button>
+      <div id="vb" class="hide"><label>Kode verifikasi (dikirim ke email kamu)</label><input id="rK" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 digit"><p style="margin:8px 0 0;font-size:13px"><a href="#" id="rsd" style="color:var(--accent)">Kirim ulang kode</a></p></div><div class="err" id="eR"></div><button class="btn" id="rB" type="submit">Kirim kode ke email</button>
     </form><form id="fF" class="hide"><label>Email</label><input id="fE" type="email"><label>Kode pemulihan</label><input id="fC" placeholder="XXXX-XXXX-XXXX"><label>Kata sandi baru</label><input id="fP" type="password" autocomplete="new-password"><div class="err" id="eF"></div><button class="btn" type="submit">Reset kata sandi</button><p style="text-align:center;margin:10px 0 0"><a href="#" id="fback" style="color:var(--accent)">← Kembali masuk</a></p></form>
   </div>
 </section>
