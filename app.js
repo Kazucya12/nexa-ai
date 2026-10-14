@@ -4,6 +4,9 @@ const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&qu
 const hash=async(p,s)=>{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s+p));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')};
 const rnd=()=>Math.random().toString(36).slice(2,10);
 const toast=t=>{const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2200)};
+let vtok=null,vmail=null;
+async function vapi(a,b){let r;try{r=await fetch('/api/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a,...b})})}catch{throw new Error('server verifikasi tidak terjangkau (pastikan situs di-deploy di Vercel)')}
+  let j={};try{j=await r.json()}catch{}if(!r.ok)throw new Error(j.error||'server error '+r.status);return j}
 let pend=[];const URLS={};let users=st.get('nx_users')||{},me=null,D=null,busy=false,ctl=null,sample=null;
 const defSet={theme:'auto',persona:'',tier:'default',tools:true};
 const save=()=>{D.ts=Date.now();st.set('nx_data_'+me,D);push()};
@@ -21,6 +24,10 @@ $('#fR').onsubmit=async e=>{e.preventDefault();const n=$('#rN').value.trim(),m=$
   if(p.length<6)return er.textContent='Kata sandi minimal 6 karakter.';
   if(p!==c)return er.textContent='Konfirmasi kata sandi tidak cocok.';
   if(users[m])return er.textContent='Email sudah terdaftar. Silakan masuk.';
+  if(!vtok||vmail!==m){er.textContent='Mengirim kode…';try{const j=await vapi('send',{email:m});vtok=j.token;vmail=m}catch(x){return er.textContent='Gagal kirim kode: '+x.message}
+    $('#vb').classList.remove('hide');$('#rB').textContent='Verifikasi & buat akun';$('#rK').focus();return er.textContent='Kode dikirim ke '+m+'. Cek Inbox atau Spam.'}
+  try{await vapi('check',{email:m,code:$('#rK').value.trim(),token:vtok})}catch(x){return er.textContent=x.message}
+  vtok=vmail=null;$('#vb').classList.add('hide');$('#rB').textContent='Kirim kode ke email';$('#rK').value='';
   const salt=rnd(),rs=rnd(),code=mkcode();users[m]={name:n,salt,rs,t:Date.now(),h:await hash(p,salt),rh:await hash(code,rs)};st.set('nx_users',users);push();pendM=m;$('#rcc').textContent=code;$('#rcv').classList.remove('hide');};
 $('#fL').onsubmit=async e=>{e.preventDefault();const m=$('#lE').value.trim().toLowerCase(),p=$('#lP').value,u=users[m],er=$('#eL');
   if(!u||u.h!==await hash(p,u.salt))return er.textContent='Email atau kata sandi salah.';
@@ -240,11 +247,12 @@ const MODELS={
 {const g=(t,f)=>'<optgroup label="'+t+'">'+Object.entries(MODELS).filter(([k,v])=>f(v)).map(([k,v])=>'<option value="'+k+'">'+v.l+'</option>').join('')+'</optgroup>';
  const h=g('Claude',v=>v.p==='claude')+g('Penyedia lain (butuh file mandiri + API key)',v=>v.p==='ext');$('#mdl').innerHTML=h;$('#sM').innerHTML=h}
 function extUI(){const k=D.set.model,M=MODELS[k],e=$('#ext');e.classList.toggle('hide',M.p!=='ext');if(M.p!=='ext')return;const c=(D.set.ext||{})[k]||{};
-  $('#xK').value=c.key||'';$('#xM').value=c.model||M.m;$('#xU').value=c.url||M.url;
+  $('#xK').value=c.key||(M.key?'••••••••••••':'');$('#xM').value=c.model||M.m;$('#xU').value=c.url||M.url;
   $('#xN').textContent=IN?'Di halaman Claude, koneksi ke penyedia lain diblokir. Unduh file mandiri dan pasang di hosting sendiri (mis. Vercel).':'Key dikirim langsung dari browser ke penyedia. Nama model bisa diubah sesuai akunmu.'}
 function setModel(k){D.set.model=k;save();$('#mdl').value=$('#sM').value=k;extUI()}
 $('#mdl').onchange=e=>setModel(e.target.value);$('#sM').onchange=e=>setModel(e.target.value);
-['xK','xM','xU'].forEach(i=>$('#'+i).oninput=()=>{const k=D.set.model;D.set.ext=D.set.ext||{};D.set.ext[k]={key:$('#xK').value.trim(),model:$('#xM').value.trim(),url:$('#xU').value.trim().replace(/\/$/,'')};save()});
+$('#xK').onfocus=e=>{if(/^•/.test(e.target.value))e.target.value=''};$('#xK').onblur=e=>{if(!e.target.value&&MODELS[D.set.model].key)e.target.value='••••••••••••'};
+['xK','xM','xU'].forEach(i=>$('#'+i).oninput=()=>{const k=D.set.model;D.set.ext=D.set.ext||{};D.set.ext[k]={key:/^•/.test($('#xK').value)?'':$('#xK').value.trim(),model:$('#xM').value.trim(),url:$('#xU').value.trim().replace(/\/$/,'')};save()});
 async function extCall(key,M,hist,imgS,sig,onText){
   if(IN)throw{message:'Model '+M.l+' tidak bisa dipakai di halaman Claude (koneksi keluar diblokir). Pakai file mandiri yang di-hosting sendiri, atau pilih model Claude.'};
   const c=(D.set.ext||{})[key]||{},url=(c.url||M.url||'').replace(/\/$/,'');
@@ -318,4 +326,5 @@ async function syncInit(){try{const d=await claude.use('db'),u=await claude.use(
 function push(){if(!SY)return;clearTimeout(stmr);stmr=setTimeout(async()=>{try{const data={};for(const k in users){const x=st.get('nx_data_'+k);if(x)data[k]=lite(x)}
   while(JSON.stringify(data).length>200000){let cut=false;for(const k in data)if(data[k].chats.length>1){data[k].chats.pop();cut=true}if(!cut)break}
   await SY.set({users:JSON.stringify(users),data:JSON.stringify(data)})}catch{}},1500)}
+$('#rsd').onclick=e=>{e.preventDefault();vtok=null;$('#fR').requestSubmit()};
 boot();syncInit();
